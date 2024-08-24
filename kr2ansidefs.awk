@@ -12,27 +12,28 @@ BEGIN{
 ### BGN FUNCTION DEFS ###
 
 function get_type(Arg){
-    match(Arg,/^.* +/)
+    match(Arg,/^(struct )?.* +/)
     Type=substr(Arg,RSTART,RLENGTH)
     return Type
 }
 function multi_var(Type, Vars){
-  split(Vars,SplitVars,",")  # split by comma
-  for (j=1;j<=length(SplitVars);j++){
+  split(Vars,SplitVars,",")             # split by comma
+  for (j=1;j<=length(SplitVars);j++){   # parse vars of Type
     sub(/;/,"",SplitVars[j])            # strip semicolon off last arg
     PARGS[PARGC++]=Type" "SplitVars[j]  # append to parsed args
   }
 }
 function parse_args(){
   for (i=1;i<=length(ARGS);i++){
-    Type = get_type(ARGS[i])  # get type
-    sub(/^.* +/,"",ARGS[i])   # strip type
-    sub(/ +/,"",Type)         # strip type spaces
+    sub(/[\t ]+$/, "", ARGS[i]) # strip line trailing spaces
+    Type = get_type(ARGS[i])    # get type
+    sub(/[\t ]+$/,"",Type)      # strip type trailing spaces
+    sub(/^(struct )?.* +/,"",ARGS[i])   # strip type from ARG
     if (match(ARGS[i],/^[^,]+,/) > 0){  # check for multiple vars of type
       multi_var(Type, ARGS[i])
     }
     else{ # single argument (not comma separated)
-      sub(/;/,"",ARGS[i])     # strip semicolon
+      sub(/;/,"",ARGS[i])            # strip semicolon
       PARGS[PARGC++]=Type" "ARGS[i]  # append to parsed args
     }
   }
@@ -49,7 +50,7 @@ function form_function(){
     }
   }
   NewFunction=Body Fields"){"
-  sub(/ +/," ",NewFunction)
+  sub(/[\t ]+/," ",NewFunction)
   print NewFunction
 }
 
@@ -88,6 +89,7 @@ function display_function(){
 # found function block
 /^[a-z_]+ .*\(.+\).*/ && !/;/{ INFUNC="ON"; INARGS="TRUE" }
 (INFUNC=="ON" && INARGS=="TRUE"){ 
+  gsub(/[\t ]+/," ")
   FUNC=$0         # capture function def
   INARGS="FALSE"  # specify not args
   next
@@ -95,6 +97,7 @@ function display_function(){
 
 # found function args
 (INFUNC=="ON"){
+  gsub(/[\t ]+/," ")
   ARGS[I++]=$0
 }
 
