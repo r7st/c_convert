@@ -1,11 +1,12 @@
 # INITIALIZE
 BEGIN{ 
   INFUNC="OFF"
-  INARGS="TRUE"
+  INARGS="FALSE"
   FUNC="NULL"
   I=1
   INCOMM="FALSE"
   PARGC=1
+  LINEC=1
 }
 
 
@@ -49,9 +50,13 @@ function form_function(){
       i++
     }
   }
+  else{
+    LINES[LINEC++]=$0
+    return
+  }
   NewFunction=Body Fields"){"
   sub(/[\t ]+/," ",NewFunction)
-  print NewFunction
+  LINES[LINEC++]=NewFunction
 }
 
 function display_function(){
@@ -61,6 +66,7 @@ function display_function(){
     form_function()  # build function in ansi format
     delete PARGS     # flush parsed args
     PARGC=1          # reset parsed arg counter
+    return
   }
 }
 
@@ -69,29 +75,44 @@ function display_function(){
 
 ### BGN PARSING FILE ###
 
+# found ansi function block
+/^[a-z_]+ +.*\( *([^,]+ +[^,]+(, +[^,]+)?){1,} *\).*/ && !/;/{
+  INFUNC="OFF"
+  INARGS="FALSE"
+  LINES[LINEC++]=$0
+  next
+}
+
+/^[a-z_]+ +.*\( *(void)? *\).*/ && !/;/{
+  INFUNC="OFF"
+  INARGS="FALSE"
+  LINES[LINEC++]=$0
+  next
+}
+
+# found k&r function block
+/^[a-z_]+ +.*\(.+\).*/ && !/;/{ INFUNC="ON"; INARGS="TRUE" }
+(INFUNC=="ON" && INARGS=="TRUE"){
+  gsub(/[\t ]+/," ")
+  FUNC=$0         # capture function def
+  INARGS="FALSE"  # specify not args
+  next
+}
+
 # skip short comments
-/^#/{ next }
+(INARGS == TRUE) && /^#/{ next }
 
 # skip long comments
-/\/\*/{ INCOMM="TRUE" }
-/\*\//{ INCOMM="FALSE"; next }
-(INCOMM == "TRUE"){ next }
+(INARGS == TRUE) && /\/\*/{ INCOMM="TRUE" }
+(INARGS == TRUE) && /\*\//{ INCOMM="FALSE"; next }
+(INARGS == TRUE) && (INCOMM == "TRUE"){ next }
 
 # handle captured function
-/^{/ && INFUNC=="ON"{ 
+/^{/ && INFUNC=="ON"{
   display_function()
   INFUNC="OFF" # reset func
   delete ARGS  # clean up args
   I=1          # reset args inc
-  next
-}
-
-# found function block
-/^[a-z_]+ .*\(.+\).*/ && !/;/{ INFUNC="ON"; INARGS="TRUE" }
-(INFUNC=="ON" && INARGS=="TRUE"){ 
-  gsub(/[\t ]+/," ")
-  FUNC=$0         # capture function def
-  INARGS="FALSE"  # specify not args
   next
 }
 
@@ -101,4 +122,11 @@ function display_function(){
   ARGS[I++]=$0
 }
 
+(INFUNC == "OFF" && INARGS == "FALSE"){ LINES[LINEC++]=$0 }
 ### END PARSING FILE ###
+
+# print transofmred file
+END{
+  for (i=0;i<length(LINES);i++)
+  print LINES[i]
+}
